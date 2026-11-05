@@ -275,8 +275,10 @@
             'Sol4': { name: 'Sol', octave: 4, freq: 392.00, color: '#06b6d4' }   // Cyan
         };
 
-        const MIN_FREQ = 245.0; // Poco más abajo de Do4
-        const MAX_FREQ = 415.0; // Poco más arriba de Sol4
+        // Rango ampliado de frecuencias (desde Sol3 ~196Hz hasta La4 ~440Hz)
+        // Esto permite que el niño cante notas más graves o más agudas sin que la bola quede clavada.
+        const MIN_FREQ = 190.0; // Bastante más abajo de Do4 (Sol3/La3)
+        const MAX_FREQ = 450.0; // Bastante más arriba de Sol4 (La4/Si4)
 
         const WORLDS = [
             {
@@ -710,7 +712,7 @@
         function freqToY(freq) {
             const clampedFreq = Math.max(MIN_FREQ, Math.min(MAX_FREQ, freq));
             const ratio = (clampedFreq - MIN_FREQ) / (MAX_FREQ - MIN_FREQ);
-            const padding = 60;
+            const padding = 50;
             return (canvas.height - padding) - ratio * (canvas.height - padding * 2);
         }
 
@@ -720,7 +722,8 @@
             elapsedTime = (Date.now() - startTime) / 1000;
             document.getElementById('game-timer').innerText = elapsedTime.toFixed(1) + 's';
 
-            if (currentDetectedFreq > 0) {
+            // Si detecta frecuencia válida en el rango ampliado, mueve la posición objetivo
+            if (currentDetectedFreq >= MIN_FREQ && currentDetectedFreq <= MAX_FREQ) {
                 player.targetY = freqToY(currentDetectedFreq);
             }
             player.y += (player.targetY - player.y) * 0.15;
