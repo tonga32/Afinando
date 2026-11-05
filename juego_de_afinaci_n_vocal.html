@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canta y Vuela - Juego de Afinación Vocal Infantil</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Quicksand', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        h1, h2, h3, .font-fun {
+            font-family: 'Fredoka One', cursive;
+        }
+        .bg-pattern {
+            background-color: #f0fdf4;
+            background-image: radial-gradient(#bbf7d0 1.5px, transparent 1.5px), radial-gradient(#bbf7d0 1.5px, #f0fdf4 1.5px);
+            background-size: 60px 60px;
+            background-position: 0 0, 30px 30px;
+        }
+        canvas {
+            touch-action: none;
+        }
+        .bounce-slight {
+            animation: bounceSlight 2s infinite ease-in-out;
+        }
+        @keyframes bounceSlight {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+    </style>
+</head>
+<body class="bg-pattern min-h-screen text-slate-800 flex flex-col justify-between">
+
+    <!-- BARRA SUPERIOR / NAVEGACIÓN -->
+    <header class="bg-white/90 backdrop-blur border-b border-emerald-100 sticky top-0 z-30 px-4 py-3 shadow-sm">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <!-- Logo / Título -->
+            <div class="flex items-center gap-3 cursor-pointer" onclick="showScreen('profile-screen')">
+                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xl shadow-md">
+                    <i class="fa-solid font-music">🎵</i>
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-fun text-emerald-600 leading-none">Canta & Vuela</h1>
+                    <span class="text-xs text-slate-500 font-bold">Edición Escolar (Base Do4)</span>
+                </div>
+            </div>
+
+            <!-- Info Perfil & Acciones -->
+            <div class="flex items-center gap-3">
+                <div id="active-profile-badge" class="hidden flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full text-sm font-semibold text-emerald-700">
+                    <i class="fa-solid fa-user-circle text-emerald-500 text-lg"></i>
+                    <span id="active-profile-name">Alumno</span>
+                </div>
+
+                <button onclick="showLeaderboardModal()" class="px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold text-sm shadow transition flex items-center gap-2">
+                    <i class="fa-solid fa-trophy"></i>
+                    <span class="hidden sm:inline">Puntajes</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENEDOR PRINCIPAL DE PANTALLAS -->
+    <main class="max-w-5xl mx-auto w-full p-4 flex-grow flex items-center justify-center">
+
+        <!-- 1. PANTALLA DE PERFILES -->
+        <section id="profile-screen" class="w-full max-w-xl bg-white rounded-3xl p-6 md:p-8 shadow-xl border border-emerald-100 text-center">
+            <div class="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 text-4xl mx-auto mb-4 bounce-slight">
+                <i class="fa-solid fa-microphone-lines"></i>
+            </div>
+            <h2 class="text-3xl font-fun text-emerald-600 mb-2">¡Bienvenido Cantante!</h2>
+            <p class="text-slate-600 mb-6">Selecciona tu perfil o crea uno nuevo para guardar tus puntajes.</p>
+
+            <!-- Formulario Nuevo Perfil -->
+            <form id="new-profile-form" onsubmit="handleCreateProfile(event)" class="mb-6 flex gap-2">
+                <input type="text" id="profile-name-input" placeholder="Escribe tu nombre o apodo..." maxlength="18" required
+                       class="flex-1 px-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-emerald-500 outline-none text-lg transition font-medium">
+                <button type="submit" class="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-fun text-lg rounded-2xl shadow-lg shadow-emerald-500/30 transition">
+                    Entrar
+                </button>
+            </form>
+
+            <!-- Lista de Perfiles -->
+            <div class="text-left">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Perfiles creados:</h3>
+                <div id="profiles-list" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    <!-- Dinámico por JS -->
+                </div>
+            </div>
+        </section>
+
+
+        <!-- 2. PANTALLA SELECCIÓN DE MUNDOS Y NIVELES -->
+        <section id="world-select-screen" class="hidden w-full space-y-6">
+            <!-- Header Sección -->
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-3xl shadow-md border border-slate-100">
+                <div>
+                    <h2 class="text-2xl md:text-3xl font-fun text-slate-800">Mapa de Niveles Vocales</h2>
+                    <p class="text-slate-500 text-sm">Elige un nivel. Cantaremos comenzando desde <b>Do4 (261.6 Hz)</b>.</p>
+                </div>
+                <button onclick="showScreen('profile-screen')" class="text-sm font-semibold text-slate-500 hover:text-slate-700 underline">
+                    <i class="fa-solid fa-arrow-left mr-1"></i> Cambiar Perfil
+                </button>
+            </div>
+
+            <!-- MUNDO 1 -->
+            <div class="bg-white rounded-3xl p-6 shadow-md border border-emerald-100">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="px-3 py-1 bg-emerald-100 text-emerald-700 font-fun rounded-xl text-sm">Mundo 1</span>
+                    <h3 class="text-xl font-fun text-slate-800">Camino de Do a Mi <span class="text-sm font-normal text-slate-500">(Do4 - Re4 - Mi4)</span></h3>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="world-1-levels">
+                    <!-- Generado por JS -->
+                </div>
+            </div>
+
+            <!-- MUNDO 2 -->
+            <div class="bg-white rounded-3xl p-6 shadow-md border border-teal-100">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="px-3 py-1 bg-teal-100 text-teal-700 font-fun rounded-xl text-sm">Mundo 2</span>
+                    <h3 class="text-xl font-fun text-slate-800">Expansión a Sol <span class="text-sm font-normal text-slate-500">(Do4 hasta Sol4)</span></h3>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="world-2-levels">
+                    <!-- Generado por JS -->
+                </div>
+            </div>
+        </section>
+
+
+        <!-- 3. PANTALLA DE JUEGO (CANVAS) -->
+        <section id="game-screen" class="hidden w-full flex flex-col items-center space-y-3">
+            
+            <!-- Barra Superior del Juego -->
+            <div class="w-full bg-white rounded-2xl p-3 shadow-md border border-slate-100 flex flex-wrap justify-between items-center gap-2">
+                <div class="flex items-center gap-3">
+                    <button onclick="exitGame()" class="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition">
+                        <i class="fa-solid fa-house"></i>
+                    </button>
+                    <div>
+                        <h3 id="game-level-title" class="font-fun text-emerald-600 text-lg leading-tight">Mundo 1 - Nivel 1</h3>
+                        <p id="game-level-notes" class="text-xs font-semibold text-slate-400">Do - Re - Mi</p>
+                    </div>
+                </div>
+
+                <!-- Indicadores de tiempo y nota actual -->
+                <div class="flex items-center gap-4">
+                    <div class="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-center">
+                        <span class="text-xs text-slate-400 font-bold block">Tu Nota:</span>
+                        <span id="detected-note-text" class="font-fun text-xl text-emerald-500">--</span>
+                    </div>
+                    <div class="bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 text-center">
+                        <span class="text-xs text-amber-600 font-bold block">Tiempo:</span>
+                        <span id="game-timer" class="font-fun text-xl text-amber-600">0.0s</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contenedor del Canvas -->
+            <div class="relative w-full aspect-[16/9] max-h-[68vh] bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border-4 border-white">
+                <canvas id="gameCanvas" class="w-full h-full"></canvas>
+
+                <!-- Overlay Inicial para Iniciar Micrófono -->
+                <div id="mic-start-overlay" class="absolute inset-0 bg-slate-900/90 backdrop-blur flex flex-col items-center justify-center p-6 text-center text-white z-20">
+                    <div class="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center text-3xl mb-4 animate-pulse">
+                        <i class="fa-solid fa-microphone"></i>
+                    </div>
+                    <h3 class="text-2xl font-fun mb-2">Permiso de Micrófono</h3>
+                    <p class="text-slate-300 text-sm max-w-md mb-6">El juego necesita escucharte para mover al personaje con tu voz. Te recomendamos usar auriculares.</p>
+                    
+                    <div class="flex flex-wrap gap-3 justify-center">
+                        <button onclick="playTargetSequence()" class="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-sm transition flex items-center gap-2">
+                            <i class="fa-solid fa-volume-high"></i> Escuchar Secuencia
+                        </button>
+                        <button onclick="startGameEngine()" class="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-fun text-lg rounded-xl shadow-lg shadow-emerald-500/40 transition">
+                            ¡Comenzar a Cantar!
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones Guía y Ayuda bajo Canvas -->
+            <div class="w-full flex justify-between items-center">
+                <button onclick="playTargetSequence()" class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-sm rounded-xl border border-slate-200 shadow-sm transition flex items-center gap-2">
+                    <i class="fa-solid fa-music text-amber-500"></i> Escuchar Guía Cantada
+                </button>
+
+                <span class="text-xs text-slate-400 font-medium">Tip: Canta notas estables y claras para guiar la pelota.</span>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER EDUCATIVO -->
+    <footer class="bg-white/80 border-t border-slate-200 py-3 text-center text-xs text-slate-500">
+        <p>Juego de Educación Musical Vocal • Nota Referencia Base: <b>Do4 (261.63 Hz)</b></p>
+    </footer>
+
+
+    <!-- MODAL TABLA DE POSICIONES (LEADERBOARD) -->
+    <div id="leaderboard-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-xl rounded-3xl p-6 shadow-2xl border border-slate-100 relative">
+            <button onclick="closeLeaderboardModal()" class="absolute top-5 right-5 text-slate-400 hover:text-slate-600 text-xl">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-500 text-2xl">
+                    <i class="fa-solid fa-trophy"></i>
+                </div>
+                <div>
+                    <h3 class="text-2xl font-fun text-slate-800 leading-tight">Tabla de Posiciones</h3>
+                    <p class="text-xs text-slate-500">Mejores puntajes por perfil</p>
+                </div>
+            </div>
+
+            <div class="space-y-3 max-h-80 overflow-y-auto pr-2" id="leaderboard-content">
+                <!-- Rellenado por JS -->
+            </div>
+        </div>
+    </div>
+
+
+    <!-- MODAL FIN DE NIVEL -->
+    <div id="level-complete-modal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-3xl p-6 text-center shadow-2xl border border-emerald-100 space-y-4">
+            <div class="w-20 h-20 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center text-4xl mx-auto bounce-slight">
+                <i class="fa-solid fa-star"></i>
+            </div>
+            <h3 class="text-3xl font-fun text-slate-800">¡Nivel Completado!</h3>
+            
+            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Tiempo:</span>
+                    <span id="modal-result-time" class="font-bold text-slate-800">0.0s</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Puntaje Obtenido:</span>
+                    <span id="modal-result-score" class="font-fun text-xl text-emerald-600">0 pts</span>
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                <button onclick="retryCurrentLevel()" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition">
+                    Reintentar
+                </button>
+                <button onclick="exitGame()" class="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-fun rounded-2xl shadow-lg shadow-emerald-500/30 transition">
+                    Continuar
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- LÓGICA DEL JUEGO Y AUDIO (JS) -->
+    <script>
+        /* -------------------------------------------------------------------------- */
+        /* CONSTANTES Y CONFIGURACIÓN MUSICAL                                         */
+        /* -------------------------------------------------------------------------- */
+        // Notas musicales y sus frecuencias fundamentales (Base Do4 / C4 = 261.63Hz)
+        const NOTES = {
+            'Do4':  { name: 'Do', octave: 4, freq: 261.63, color: '#ef4444' },  // Rojo
+            'Re4':  { name: 'Re', octave: 4, freq: 293.66, color: '#f97316' },  // Naranja
+            'Mi4':  { name: 'Mi', octave: 4, freq: 329.63, color: '#eab308' },  // Amarillo
+            'Fa4':  { name: 'Fa', octave: 4, freq: 349.23, color: '#22c55e' },  // Verde
+            'Sol4': { name: 'Sol', octave: 4, freq: 392.00, color: '#06b6d4' }   // Cyan
+        };
+
+        // Rango de Frecuencias del Juego
+        const MIN_FREQ = 245.0; // Poco más abajo de Do4
+        const MAX_FREQ = 415.0; // Poco más arriba de Sol4
+
+        // Estructura de Mundos y Niveles
+        const WORLDS = [
+            {
+                id: 1,
+                name: "Mundo 1: Do a Mi",
+                levels: [
+                    { id: '1-1', title: 'Nivel 1: Subida Do-Re-Mi', notes: ['Do4', 'Re4', 'Mi4'] },
+                    { id: '1-2', title: 'Nivel 2: Ida y Vuelta', notes: ['Do4', 'Re4', 'Mi4', 'Re4', 'Do4'] },
+                    { id: '1-3', title: 'Nivel 3: Salto de 3ª', notes: ['Do4', 'Mi4', 'Do4'] },
+                    { id: '1-4', title: 'Nivel 4: Recreo Do-Re-Do', notes: ['Do4', 'Re4', 'Do4'] }
+                ]
+            },
+            {
+                id: 2,
+                name: "Mundo 2: Do a Sol",
+                levels: [
+                    { id: '2-1', title: 'Nivel 1: Escalera a Sol', notes: ['Do4', 'Re4', 'Mi4', 'Fa4', 'Sol4'] },
+                    { id: '2-2', title: 'Nivel 2: Subida y Bajada', notes: ['Do4', 'Re4', 'Mi4', 'Fa4', 'Sol4', 'Fa4', 'Mi4', 'Re4', 'Do4'] },
+                    { id: '2-3', title: 'Nivel 3: Saltos de 3ª', notes: ['Do4', 'Mi4', 'Sol4', 'Mi4', 'Do4'] },
+                    { id: '2-4', title: 'Nivel 4: Salto de 5ª', notes: ['Do4', 'Sol4', 'Do4'] }
+                ]
+            }
+        ];
+
+        /* -------------------------------------------------------------------------- */
+        /* ESTADO GLOBAL                                                              */
+        /* -------------------------------------------------------------------------- */
+        let profiles = JSON.parse(localStorage.getItem('sing_game_profiles') || '[]');
+        let currentProfile = null;
+        let currentLevel = null;
+        
+        // Estado del Audio
+        let audioCtx = null;
+        let analyser = null;
+        let microphoneStream = null;
+        let currentDetectedFreq = 0;
+        let currentDetectedNote = "--";
+
+        // Estado del Loop del Juego
+        let gameRunning = false;
+        let animationFrameId = null;
+        let startTime = 0;
+        let elapsedTime = 0;
+
+        // Variables del Canvas
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Entidades del Juego
+        let player = { x: 80, y: 0, radius: 18, targetY: 0 };
+        let obstacles = [];
+        let gameSpeed = 2.0;
+
+        /* -------------------------------------------------------------------------- */
+        /* INICIALIZACIÓN DE LA APLICACIÓN                                            */
+        /* -------------------------------------------------------------------------- */
+        window.addEventListener('load', () => {
+            renderProfilesList();
+            renderLevelMaps();
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+        });
+
+        function resizeCanvas() {
+            if (!canvas.parentElement) return;
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+
+        /* -------------------------------------------------------------------------- */
+        /* GESTIÓN DE NAVEGACIÓN DE PANTALLAS                                         */
+        /* -------------------------------------------------------------------------- */
+        function showScreen(screenId) {
+            document.getElementById('profile-screen').classList.add('hidden');
+            document.getElementById('world-select-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.add('hidden');
+
+            document.getElementById(screenId).classList.remove('hidden');
+
+            if (screenId === 'world-select-screen') {
+                updateProfileBadge();
+            }
+        }
+
+        /* -------------------------------------------------------------------------- */
+        /* SISTEMA DE PERFILES DE USUARIO                                             */
+        /* -------------------------------------------------------------------------- */
+        function handleCreateProfile(e) {
+            e.preventDefault();
+            const input = document.getElementById('profile-name-input');
+            const name = input.value.trim();
+            if (!name) return;
+
+            let existing = profiles.find(p => p.name.toLowerCase() === name.toLowerCase());
+            if (!existing) {
+                existing = { id: Date.now(), name: name, scores: {} };
+                profiles.push(existing);
+                saveProfiles();
+            }
+            selectProfile(existing.id);
+            input.value = '';
+        }
+
+        function selectProfile(profileId) {
+            currentProfile = profiles.find(p => p.id === profileId);
+            updateProfileBadge();
+            renderProfilesList();
+            showScreen('world-select-screen');
+        }
+
+        function deleteProfile(profileId, e) {
+            e.stopPropagation();
+            profiles = profiles.filter(p => p.id !== profileId);
+            if (currentProfile && currentProfile.id === profileId) {
+                currentProfile = null;
+            }
+            saveProfiles();
+            renderProfilesList();
+            updateProfileBadge();
+        }
+
+        function saveProfiles() {
+            localStorage.setItem('sing_game_profiles', JSON.stringify(profiles));
+        }
+
+        function updateProfileBadge() {
+            const badge = document.getElementById('active-profile-badge');
+            const nameSpan = document.getElementById('active-profile-name');
+            if (currentProfile) {
+                nameSpan.innerText = currentProfile.name;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        function renderProfilesList() {
+            const list = document.getElementById('profiles-list');
+            list.innerHTML = '';
+
+            if (profiles.length === 0) {
+                list.innerHTML = `<p class="text-xs text-slate-400 italic">No hay perfiles creados todavía.</p>`;
+                return;
+            }
+
+            profiles.forEach(p => {
+                const totalScore = Object.values(p.scores).reduce((a, b) => a + b, 0);
+                const isSelected = currentProfile && currentProfile.id === p.id;
+                
+                const item = document.createElement('div');
+                item.className = `flex justify-between items-center p-3 rounded-2xl cursor-pointer transition ${
+                    isSelected ? 'bg-emerald-100 border border-emerald-300' : 'bg-slate-50 hover:bg-slate-100 border border-slate-200'
+                }`;
+                item.onclick = () => selectProfile(p.id);
+
+                item.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full ${isSelected ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-600'} flex items-center justify-center font-bold text-sm">
+                            ${p.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <span class="font-bold text-slate-700 block text-sm leading-none">${p.name}</span>
+                            <span class="text-xs text-slate-400">${totalScore} pts acumulados</span>
+                        </div>
+                    </div>
+                    <button onclick="deleteProfile(${p.id}, event)" class="text-slate-300 hover:text-red-500 p-1">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        /* -------------------------------------------------------------------------- */
+        /* DIBUJADO DE MUNDOS Y NIVELES                                               */
+        /* -------------------------------------------------------------------------- */
+        function renderLevelMaps() {
+            WORLDS.forEach(world => {
+                const container = document.getElementById(`world-${world.id}-levels`);
+                container.innerHTML = '';
+
+                world.levels.forEach(lvl => {
+                    const bestScore = currentProfile?.scores[lvl.id] || 0;
+
+                    const card = document.createElement('div');
+                    card.className = "bg-slate-50 hover:bg-emerald-50/50 border-2 border-slate-200 hover:border-emerald-300 rounded-2xl p-4 transition cursor-pointer flex flex-col justify-between";
+                    card.onclick = () => prepareGameLevel(lvl);
+
+                    card.innerHTML = `
+                        <div>
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="font-fun text-slate-800 text-base">${lvl.title}</span>
+                                ${bestScore > 0 ? '<i class="fa-solid fa-star text-amber-400 text-sm"></i>' : ''}
+                            </div>
+                            <div class="flex flex-wrap gap-1 mb-3">
+                                ${lvl.notes.map(n => `<span class="px-2 py-0.5 bg-white border border-slate-200 rounded-md text-xs font-semibold text-slate-600">${NOTES[n].name}</span>`).join('')}
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center text-xs pt-2 border-t border-slate-200">
+                            <span class="text-slate-400 font-medium">Record:</span>
+                            <span class="font-bold ${bestScore > 0 ? 'text-emerald-600' : 'text-slate-400'}">${bestScore} pts</span>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            });
+        }
+
+        /* -------------------------------------------------------------------------- */
+        /* MOTOR AUDIO: SINTETIZADOR DE REFERENCIA Y AUTOCORRELACIÓN (Pitch Detection)*/
+        /* -------------------------------------------------------------------------- */
+        function initAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Tocar notas de guía melódica
+        function playTargetSequence() {
+            initAudioContext();
+            if (!currentLevel) return;
+
+            let timeOffset = 0.1;
+            currentLevel.notes.forEach(noteKey => {
+                const note = NOTES[noteKey];
+                if (!note) return;
+
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.value = note.freq;
+
+                gain.gain.setValueAtTime(0, audioCtx.currentTime + timeOffset);
+                gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + timeOffset + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + timeOffset + 0.6);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start(audioCtx.currentTime + timeOffset);
+                osc.stop(audioCtx.currentTime + timeOffset + 0.65);
+
+                timeOffset += 0.7;
+            });
+        }
+
+        // Detección de Frecuencia mediante Autocorrelación
+        async function startPitchDetection() {
+            initAudioContext();
+
+            try {
+                microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                const source = audioCtx.createMediaStreamSource(microphoneStream);
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 2048;
+                source.connect(analyser);
+
+                processPitch();
+            } catch (err) {
+                alert("No se pudo acceder al micrófono. Por favor permite el acceso para jugar.");
+                console.error(err);
+            }
+        }
+
+        function processPitch() {
+            if (!gameRunning) return;
+
+            const buffer = new Float32Array(analyser.fftSize);
+            analyser.getFloatTimeDomainData(buffer);
+
+            const pitch = autoCorrelate(buffer, audioCtx.sampleRate);
+            
+            if (pitch !== -1 && pitch >= MIN_FREQ && pitch <= MAX_FREQ) {
+                // Suavizado de frecuencia detectada
+                currentDetectedFreq = currentDetectedFreq * 0.7 + pitch * 0.3;
+                currentDetectedNote = getClosestNoteName(currentDetectedFreq);
+            } else {
+                currentDetectedNote = "--";
+            }
+
+            document.getElementById('detected-note-text').innerText = currentDetectedNote;
+
+            if (gameRunning) {
+                requestAnimationFrame(processPitch);
+            }
+        }
+
+        // Algoritmo de Autocorrelación para Pitch Detection
+        function autoCorrelate(buf, sampleRate) {
+            let SIZE = buf.length;
+            let rms = 0;
+
+            for (let i = 0; i < SIZE; i++) {
+                let val = buf[i];
+                rms += val * val;
+            }
+            rms = Math.sqrt(rms / SIZE);
+
+            // Umbral de silencio
+            if (rms < 0.015) return -1;
+
+            let r1 = 0, r2 = SIZE - 1, thres = 0.2;
+            for (let i = 0; i < SIZE / 2; i++) {
+                if (Math.abs(buf[i]) < thres) { r1 = i; break; }
+            }
+            for (let i = 1; i < SIZE / 2; i++) {
+                if (Math.abs(buf[SIZE - i]) < thres) { r2 = SIZE - i; break; }
+            }
+
+            buf = buf.slice(r1, r2);
+            SIZE = buf.length;
+
+            let c = new Array(SIZE).fill(0);
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE - i; j++) {
+                    c[i] = c[i] + buf[j] * buf[j + i];
+                }
+            }
+
+            let d = 0;
+            while (c[d] > c[d + 1]) d++;
+            let maxval = -1, maxpos = -1;
+
+            for (let i = d; i < SIZE; i++) {
+                if (c[i] > maxval) {
+                    maxval = c[i];
+                    maxpos = i;
+                }
+            }
+            let T0 = maxpos;
+
+            // Interpolación parabólica para precisión fina
+            let x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1];
+            let a = (x1 + x3 - 2 * x2) / 2;
+            let b = (x3 - x1) / 2;
+            if (a) T0 = T0 - b / (2 * a);
+
+            return sampleRate / T0;
+        }
+
+        function getClosestNoteName(freq) {
+            let minDiff = Infinity;
+            let closest = "--";
+
+            for (const key in NOTES) {
+                const diff = Math.abs(NOTES[key].freq - freq);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closest = NOTES[key].name;
+                }
+            }
+            return closest;
+        }
+
+        /* -------------------------------------------------------------------------- */
+        /* MOTOR DEL JUEGO (CANVAS ENGINE)                                            */
+        /* -------------------------------------------------------------------------- */
+        function prepareGameLevel(level) {
+            currentLevel = level;
+            document.getElementById('game-level-title').innerText = level.title;
+            document.getElementById('game-level-notes').innerText = level.notes.map(n => NOTES[n].name).join(' - ');
+            
+            document.getElementById('mic-start-overlay').classList.remove('hidden');
+            showScreen('game-screen');
+            resizeCanvas();
+        }
+
+        function startGameEngine() {
+            document.getElementById('mic-start-overlay').classList.add('hidden');
+            
+            // Inicializar objetos de juego
+            player.y = canvas.height / 2;
+            player.targetY = canvas.height / 2;
+
+            generateObstacles();
+
+            startTime = Date.now();
+            gameRunning = true;
+
+            startPitchDetection();
+            gameLoop();
+        }
+
+        function generateObstacles() {
+            obstacles = [];
+            const spacing = canvas.width * 0.45;
+            let currentX = canvas.width + 100;
+
+            currentLevel.notes.forEach((noteKey) => {
+                const note = NOTES[noteKey];
+                obstacles.push({
+                    x: currentX,
+                    noteKey: noteKey,
+                    note: note,
+                    passed: false
+                });
+                currentX += spacing;
+            });
+        }
+
+        // Convertir Frecuencia a coordenada Y en Canvas
+        function freqToY(freq) {
+            const clampedFreq = Math.max(MIN_FREQ, Math.min(MAX_FREQ, freq));
+            // Invertido: notas más agudas = más arriba (Y menor)
+            const ratio = (clampedFreq - MIN_FREQ) / (MAX_FREQ - MIN_FREQ);
+            const padding = 60;
+            return (canvas.height - padding) - ratio * (canvas.height - padding * 2);
+        }
+
+        function gameLoop() {
+            if (!gameRunning) return;
+
+            // Actualizar Temporizador
+            elapsedTime = (Date.now() - startTime) / 1000;
+            document.getElementById('game-timer').innerText = elapsedTime.toFixed(1) + 's';
+
+            // Actualizar Posición del Jugador con Suavizado (Lerp)
+            if (currentDetectedFreq > 0) {
+                player.targetY = freqToY(currentDetectedFreq);
+            }
+            player.y += (player.targetY - player.y) * 0.15;
+
+            // Limpiar Canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Dibujar Líneas Guía de las Notas (Pentagrama Adaptado)
+            drawNoteGuides();
+
+            // 2. Mover y Dibujar Obstáculos (Paredes con Agujeros)
+            let allPassed = true;
+            obstacles.forEach(obs => {
+                obs.x -= gameSpeed;
+
+                const holeY = freqToY(obs.note.freq);
+                const holeHeight = 85;
+
+                // Dibujar la pared arriba y abajo del agujero
+                ctx.fillStyle = '#334155'; // Slate-700
+                
+                // Pared Superior
+                ctx.fillRect(obs.x - 12, 0, 24, holeY - holeHeight / 2);
+                // Pared Inferior
+                ctx.fillRect(obs.x - 12, holeY + holeHeight / 2, 24, canvas.height - (holeY + holeHeight / 2));
+
+                // Borde y Destello del Agujero
+                ctx.strokeStyle = obs.note.color;
+                ctx.lineWidth = 4;
+                ctx.strokeRect(obs.x - 14, holeY - holeHeight / 2, 28, holeHeight);
+
+                // Nombre de la Nota en el Agujero
+                ctx.fillStyle = obs.note.color;
+                ctx.font = 'bold 16px "Fredoka One", cursive';
+                ctx.textAlign = 'center';
+                ctx.fillText(obs.note.name, obs.x, holeY + 5);
+
+                // Verificar colisión / paso
+                if (Math.abs(player.x - obs.x) < 20) {
+                    const inHole = Math.abs(player.y - holeY) < (holeHeight / 2 - 5);
+                    if (!inHole) {
+                        // Rebote leve en caso de desajuste
+                        player.y += (player.y < holeY) ? -4 : 4;
+                    }
+                }
+
+                if (obs.x > player.x) {
+                    allPassed = false;
+                }
+            });
+
+            // 3. Dibujar al Jugador (Pelotita Alegre)
+            drawPlayer();
+
+            // Verificar si terminó el nivel
+            if (allPassed && obstacles.length > 0 && obstacles[obstacles.length - 1].x < player.x - 40) {
+                finishLevel();
+                return;
+            }
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function drawNoteGuides() {
+            Object.keys(NOTES).forEach(key => {
+                const note = NOTES[key];
+                const y = freqToY(note.freq);
+
+                ctx.beginPath();
+                ctx.strokeStyle = note.color + '40'; // Semi-transparente
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6, 6]);
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Etiqueta de la nota en el lateral izquierdo
+                ctx.fillStyle = note.color;
+                ctx.font = 'bold 12px Quicksand';
+                ctx.textAlign = 'left';
+                ctx.fillText(note.name, 10, y + 4);
+            });
+        }
+
+        function drawPlayer() {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#10b981'; // Emerald-500
+            ctx.shadowColor = '#10b98188';
+            ctx.shadowBlur = 12;
+            ctx.fill();
+
+            // Ojitos del personaje
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(player.x - 5, player.y - 4, 4, 0, Math.PI * 2);
+            ctx.arc(player.x + 5, player.y - 4, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(player.x - 4, player.y - 4, 2, 0, Math.PI * 2);
+            ctx.arc(player.x + 4, player.y - 4, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Sonrisa
+            ctx.beginPath();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.arc(player.x, player.y + 2, 5, 0.1 * Math.PI, 0.9 * Math.PI);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        /* -------------------------------------------------------------------------- */
+        /* RESULTADOS Y TABLA DE POSICIONES                                           */
+        /* -------------------------------------------------------------------------- */
+        function finishLevel() {
+            gameRunning = false;
+            cancelAnimationFrame(animationFrameId);
+
+            // Detener Micrófono
+            if (microphoneStream) {
+                microphoneStream.getTracks().forEach(track => track.stop());
+            }
+
+            // Cálculo de Puntaje
+            const baseScore = 1000;
+            const timePenalty = Math.floor(elapsedTime * 25);
+            const finalScore = Math.max(100, baseScore - timePenalty);
+
+            // Guardar Puntaje en Perfil Activo
+            if (currentProfile) {
+                const prevScore = currentProfile.scores[currentLevel.id] || 0;
+                if (finalScore > prevScore) {
+                    currentProfile.scores[currentLevel.id] = finalScore;
+                    saveProfiles();
+                }
+            }
+
+            // Mostrar Modal con Confeti
+            document.getElementById('modal-result-time').innerText = elapsedTime.toFixed(1) + 's';
+            document.getElementById('modal-result-score').innerText = finalScore + ' pts';
+            document.getElementById('level-complete-modal').classList.remove('hidden');
+
+            confetti({
+                particleCount: 80,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+        }
+
+        function retryCurrentLevel() {
+            document.getElementById('level-complete-modal').classList.add('hidden');
+            startGameEngine();
+        }
+
+        function exitGame() {
+            gameRunning = false;
+            cancelAnimationFrame(animationFrameId);
+            if (microphoneStream) {
+                microphoneStream.getTracks().forEach(track => track.stop());
+            }
+            document.getElementById('level-complete-modal').classList.add('hidden');
+            renderLevelMaps();
+            showScreen('world-select-screen');
+        }
+
+        /* Modal Leaderboard */
+        function showLeaderboardModal() {
+            const container = document.getElementById('leaderboard-content');
+            container.innerHTML = '';
+
+            if (profiles.length === 0) {
+                container.innerHTML = '<p class="text-slate-400 text-center py-4 text-sm">No hay datos registrados aún.</p>';
+            } else {
+                // Ordenar perfiles por puntaje acumulado
+                const sorted = [...profiles].sort((a, b) => {
+                    const scoreA = Object.values(a.scores).reduce((x, y) => x + y, 0);
+                    const scoreB = Object.values(b.scores).reduce((x, y) => x + y, 0);
+                    return scoreB - scoreA;
+                });
+
+                sorted.forEach((p, idx) => {
+                    const totalScore = Object.values(p.scores).reduce((x, y) => x + y, 0);
+                    const item = document.createElement('div');
+                    item.className = "flex justify-between items-center bg-slate-50 p-3 rounded-2xl border border-slate-200";
+                    
+                    item.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <span class="font-fun text-lg w-6 text-center ${idx === 0 ? 'text-amber-500' : 'text-slate-400'}">#${idx + 1}</span>
+                            <span class="font-bold text-slate-700">${p.name}</span>
+                        </div>
+                        <span class="font-fun text-emerald-600 text-lg">${totalScore} pts</span>
+                    `;
+                    container.appendChild(item);
+                });
+            }
+
+            document.getElementById('leaderboard-modal').classList.remove('hidden');
+        }
+
+        function closeLeaderboardModal() {
+            document.getElementById('leaderboard-modal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
