@@ -114,6 +114,22 @@
                 </button>
             </div>
 
+            <!-- TABLA DE RANKING GENERAL -->
+            <div class="bg-white rounded-3xl p-6 shadow-md border border-amber-100">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-trophy"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-fun text-slate-800">Tabla de Rankings General</h3>
+                        <p class="text-xs text-slate-400">Puntajes totales acumulados de mayor a menor</p>
+                    </div>
+                </div>
+                <div id="inline-ranking-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <!-- Generado por JS -->
+                </div>
+            </div>
+
             <!-- MUNDO 1 -->
             <div class="bg-white rounded-3xl p-6 shadow-md border border-emerald-100">
                 <div class="flex items-center gap-3 mb-4">
@@ -277,8 +293,8 @@
 
         // Rango ampliado de frecuencias (desde Sol3 ~196Hz hasta La4 ~440Hz)
         // Esto permite que el niño cante notas más graves o más agudas sin que la bola quede clavada.
-        const MIN_FREQ = 190.0; // Bastante más abajo de Do4 (Sol3/La3)
-        const MAX_FREQ = 450.0; // Bastante más arriba de Sol4 (La4/Si4)
+        const MIN_FREQ = 180.0; // Más abajo de Do4 (Sol3/La3)
+        const MAX_FREQ = 460.0; // Más arriba de Sol4 (La4/Si4)
 
         const WORLDS = [
             {
@@ -354,9 +370,12 @@
 
             if (screenId === 'world-select-screen') {
                 updateProfileBadge();
+                renderInlineRanking();
             }
         }
 
+        /* -------------------------------------------------------------------------- */
+        /* SISTEMA DE PERFILES Y RANKING                                              */
         /* -------------------------------------------------------------------------- */
         /* SISTEMA DE PERFILES DE USUARIO                                             */
         /* -------------------------------------------------------------------------- */
@@ -444,6 +463,46 @@
                     </button>
                 `;
                 list.appendChild(item);
+            });
+        }
+
+        function renderInlineRanking() {
+            const container = document.getElementById('inline-ranking-list');
+            if (!container) return;
+            container.innerHTML = '';
+
+            if (profiles.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-400 italic col-span-full">Aún no hay perfiles registrados.</p>`;
+                return;
+            }
+
+            const sorted = [...profiles].map(p => ({
+                id: p.id,
+                name: p.name,
+                totalScore: Object.values(p.scores).reduce((a, b) => a + b, 0)
+            })).sort((a, b) => b.totalScore - a.totalScore);
+
+            const medals = ['🥇', '🥈', '🥉'];
+
+            sorted.forEach((p, index) => {
+                const isCurrent = currentProfile && currentProfile.id === p.id;
+                const card = document.createElement('div');
+                card.className = `flex justify-between items-center p-3 rounded-2xl border transition ${
+                    isCurrent ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-400/30' : 'bg-slate-50 border-slate-200'
+                }`;
+
+                const rankDisplay = index < 3 
+                    ? `<span class="text-xl mr-1">${medals[index]}</span>` 
+                    : `<span class="w-6 text-center font-fun text-slate-400 text-sm">#${index + 1}</span>`;
+
+                card.innerHTML = `
+                    <div class="flex items-center gap-2 overflow-hidden">
+                        ${rankDisplay}
+                        <span class="font-bold text-slate-700 truncate text-sm">${p.name} ${isCurrent ? '<span class="text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded-md font-semibold">Tú</span>' : ''}</span>
+                    </div>
+                    <span class="font-fun text-emerald-600 text-sm whitespace-nowrap ml-2">${p.totalScore} pts</span>
+                `;
+                container.appendChild(card);
             });
         }
 
@@ -561,6 +620,11 @@
         async function startPitchDetection() {
             initAudioContext();
 
+            // Desbloqueo forzado de audio en navegadores móviles (iOS/Android)
+            if (audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+            }
+
             try {
                 microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
                 const source = audioCtx.createMediaStreamSource(microphoneStream);
@@ -584,9 +648,11 @@
             const pitch = autoCorrelate(buffer, audioCtx.sampleRate);
             
             if (pitch !== -1 && pitch >= MIN_FREQ && pitch <= MAX_FREQ) {
-                currentDetectedFreq = currentDetectedFreq * 0.7 + pitch * 0.3;
+                currentDetectedFreq = currentDetectedFreq * 0.6 + pitch * 0.4;
                 currentDetectedNote = getClosestNoteName(currentDetectedFreq);
-            } else {
+            } else if (pitch === -1) {
+                // Si no hay voz o sonido suficiente, la pelota reposa por debajo de Do4
+                currentDetectedFreq = currentDetectedFreq * 0.9 + (MIN_FREQ) * 0.1;
                 currentDetectedNote = "--";
             }
 
@@ -678,9 +744,16 @@
         function startGameEngine() {
             document.getElementById('mic-start-overlay').classList.add('hidden');
             
+            // Garantizar que AudioContext se active en móviles en la respuesta al toque/clic
+            initAudioContext();
+
+            resizeCanvas();
+
             player.x = canvas.width * 0.2;
-            player.y = canvas.height / 2;
-            player.targetY = canvas.height / 2;
+            // La pelota arranca explícitamente por debajo de Do4 (zona inferior)
+            currentDetectedFreq = MIN_FREQ;
+            player.targetY = freqToY(MIN_FREQ);
+            player.y = player.targetY;
             player.bounceVelocityX = 0;
 
             generateObstacles();
@@ -712,7 +785,8 @@
         function freqToY(freq) {
             const clampedFreq = Math.max(MIN_FREQ, Math.min(MAX_FREQ, freq));
             const ratio = (clampedFreq - MIN_FREQ) / (MAX_FREQ - MIN_FREQ);
-            const padding = 50;
+            const padding = 35;
+            // Invertido: notas graves abajo (alto Y), agudas arriba (bajo Y)
             return (canvas.height - padding) - ratio * (canvas.height - padding * 2);
         }
 
@@ -722,11 +796,9 @@
             elapsedTime = (Date.now() - startTime) / 1000;
             document.getElementById('game-timer').innerText = elapsedTime.toFixed(1) + 's';
 
-            // Si detecta frecuencia válida en el rango ampliado, mueve la posición objetivo
-            if (currentDetectedFreq >= MIN_FREQ && currentDetectedFreq <= MAX_FREQ) {
-                player.targetY = freqToY(currentDetectedFreq);
-            }
-            player.y += (player.targetY - player.y) * 0.15;
+            // Actualizar la posición deseada de la pelota verticalmente
+            player.targetY = freqToY(currentDetectedFreq);
+            player.y += (player.targetY - player.y) * 0.18;
 
             if (player.bounceVelocityX < 0) {
                 player.bounceVelocityX += 0.4;
@@ -738,9 +810,10 @@
             drawNoteGuides();
 
             let allPassed = true;
+            // Tolerancia de 25 Cents (1/4 de semitono hacia arriba y hacia abajo)
             const semitoneRatio = Math.pow(2, 1/12);
-            const quarterToneRatioUpper = Math.pow(semitoneRatio, 0.5);
-            const quarterToneRatioLower = Math.pow(semitoneRatio, -0.5);
+            const quarterToneRatioUpper = Math.pow(semitoneRatio, 0.25);
+            const quarterToneRatioLower = Math.pow(semitoneRatio, -0.25);
 
             obstacles.forEach(obs => {
                 obs.x -= (gameSpeed + player.bounceVelocityX);
@@ -749,7 +822,8 @@
                 const upperLimitY = freqToY(obs.note.freq * quarterToneRatioUpper);
                 const lowerLimitY = freqToY(obs.note.freq * quarterToneRatioLower);
                 
-                const holeHeight = Math.max(player.radius * 2 + 4, Math.abs(lowerLimitY - upperLimitY));
+                // Agujero muy preciso ajustado exactamente a 25 cents
+                const holeHeight = Math.max(player.radius * 2, Math.abs(lowerLimitY - upperLimitY));
                 const wallWidth = 28;
 
                 ctx.fillStyle = '#1e293b';
