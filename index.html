@@ -47,7 +47,7 @@
             <!-- Logo / Título -->
             <div class="flex items-center gap-3 cursor-pointer" onclick="showScreen('profile-screen')">
                 <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-400 to-teal-500 flex items-center justify-center text-white text-xl shadow-md">
-                    <i class="fa-solid font-music">🎵</i>
+                    <span>🎵</span>
                 </div>
                 <div>
                     <h1 class="text-xl md:text-2xl font-fun text-emerald-600 leading-none">Canta & Vuela</h1>
@@ -81,7 +81,7 @@
             <h2 class="text-3xl font-fun text-emerald-600 mb-2">¡Bienvenido Cantante!</h2>
             <p class="text-slate-600 mb-6">Selecciona tu perfil o crea uno nuevo para guardar tus puntajes.</p>
 
-            <!-- Formulario Nuevo Perfil sin relanzamiento de página -->
+            <!-- Formulario Nuevo Perfil -->
             <div class="mb-6 flex gap-2">
                 <input type="text" id="profile-name-input" placeholder="Escribe tu nombre o apodo..." maxlength="18"
                        onkeydown="if(event.key === 'Enter') handleCreateProfile(event)"
@@ -267,7 +267,6 @@
         /* -------------------------------------------------------------------------- */
         /* CONSTANTES Y CONFIGURACIÓN MUSICAL                                         */
         /* -------------------------------------------------------------------------- */
-        // Notas musicales y sus frecuencias fundamentales (Base Do4 / C4 = 261.63Hz)
         const NOTES = {
             'Do4':  { name: 'Do', octave: 4, freq: 261.63, color: '#ef4444' },  // Rojo
             'Re4':  { name: 'Re', octave: 4, freq: 293.66, color: '#f97316' },  // Naranja
@@ -276,11 +275,9 @@
             'Sol4': { name: 'Sol', octave: 4, freq: 392.00, color: '#06b6d4' }   // Cyan
         };
 
-        // Rango de Frecuencias del Juego
         const MIN_FREQ = 245.0; // Poco más abajo de Do4
         const MAX_FREQ = 415.0; // Poco más arriba de Sol4
 
-        // Estructura de Mundos y Niveles
         const WORLDS = [
             {
                 id: 1,
@@ -311,27 +308,23 @@
         let currentProfile = null;
         let currentLevel = null;
         
-        // Estado del Audio
         let audioCtx = null;
         let analyser = null;
         let microphoneStream = null;
         let currentDetectedFreq = 0;
         let currentDetectedNote = "--";
 
-        // Estado del Loop del Juego
         let gameRunning = false;
         let animationFrameId = null;
         let startTime = 0;
         let elapsedTime = 0;
 
-        // Variables del Canvas
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         
-        // Entidades del Juego
         let player = { x: 80, y: 0, radius: 18, targetY: 0, bounceVelocityX: 0 };
         let obstacles = [];
-        let gameSpeed = 1.3; // Velocidad reducida para mejor margen de reacción infantiles
+        let gameSpeed = 1.3;
         let bounceEffectTimer = 0;
 
         /* -------------------------------------------------------------------------- */
@@ -350,9 +343,6 @@
             canvas.height = canvas.parentElement.clientHeight;
         }
 
-        /* -------------------------------------------------------------------------- */
-        /* GESTIÓN DE NAVEGACIÓN DE PANTALLAS                                         */
-        /* -------------------------------------------------------------------------- */
         function showScreen(screenId) {
             document.getElementById('profile-screen').classList.add('hidden');
             document.getElementById('world-select-screen').classList.add('hidden');
@@ -392,7 +382,7 @@
         }
 
         function deleteProfile(profileId, e) {
-            e.stopPropagation();
+            if (e && e.stopPropagation) e.stopPropagation();
             profiles = profiles.filter(p => p.id !== profileId);
             if (currentProfile && currentProfile.id === profileId) {
                 currentProfile = null;
@@ -419,6 +409,7 @@
 
         function renderProfilesList() {
             const list = document.getElementById('profiles-list');
+            if (!list) return;
             list.innerHTML = '';
 
             if (profiles.length === 0) {
@@ -454,12 +445,47 @@
             });
         }
 
+        function showLeaderboardModal() {
+            const modal = document.getElementById('leaderboard-modal');
+            const content = document.getElementById('leaderboard-content');
+            content.innerHTML = '';
+
+            if (profiles.length === 0) {
+                content.innerHTML = `<p class="text-center text-slate-400 py-4 text-sm">No hay datos registrados aún.</p>`;
+            } else {
+                const sorted = [...profiles].map(p => ({
+                    name: p.name,
+                    totalScore: Object.values(p.scores).reduce((a, b) => a + b, 0)
+                })).sort((a, b) => b.totalScore - a.totalScore);
+
+                sorted.forEach((p, i) => {
+                    const row = document.createElement('div');
+                    row.className = "flex justify-between items-center p-3 rounded-xl bg-slate-50 border border-slate-100";
+                    row.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <span class="w-6 text-center font-fun text-slate-400">${i + 1}º</span>
+                            <span class="font-bold text-slate-700">${p.name}</span>
+                        </div>
+                        <span class="font-fun text-emerald-600">${p.totalScore} pts</span>
+                    `;
+                    content.appendChild(row);
+                });
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeLeaderboardModal() {
+            document.getElementById('leaderboard-modal').classList.add('hidden');
+        }
+
         /* -------------------------------------------------------------------------- */
         /* DIBUJADO DE MUNDOS Y NIVELES                                               */
         /* -------------------------------------------------------------------------- */
         function renderLevelMaps() {
             WORLDS.forEach(world => {
                 const container = document.getElementById(`world-${world.id}-levels`);
+                if (!container) return;
                 container.innerHTML = '';
 
                 world.levels.forEach(lvl => {
@@ -490,7 +516,7 @@
         }
 
         /* -------------------------------------------------------------------------- */
-        /* MOTOR AUDIO: SINTETIZADOR DE REFERENCIA Y AUTOCORRELACIÓN (Pitch Detection)*/
+        /* AUDIO ENGINE & PITCH DETECTION                                             */
         /* -------------------------------------------------------------------------- */
         function initAudioContext() {
             if (!audioCtx) {
@@ -501,7 +527,6 @@
             }
         }
 
-        // Tocar notas de guía melódica
         function playTargetSequence() {
             initAudioContext();
             if (!currentLevel) return;
@@ -531,7 +556,6 @@
             });
         }
 
-        // Detección de Frecuencia mediante Autocorrelación
         async function startPitchDetection() {
             initAudioContext();
 
@@ -558,21 +582,20 @@
             const pitch = autoCorrelate(buffer, audioCtx.sampleRate);
             
             if (pitch !== -1 && pitch >= MIN_FREQ && pitch <= MAX_FREQ) {
-                // Suavizado de frecuencia detectada
                 currentDetectedFreq = currentDetectedFreq * 0.7 + pitch * 0.3;
                 currentDetectedNote = getClosestNoteName(currentDetectedFreq);
             } else {
                 currentDetectedNote = "--";
             }
 
-            document.getElementById('detected-note-text').innerText = currentDetectedNote;
+            const noteDisplay = document.getElementById('detected-note-text');
+            if (noteDisplay) noteDisplay.innerText = currentDetectedNote;
 
             if (gameRunning) {
                 requestAnimationFrame(processPitch);
             }
         }
 
-        // Algoritmo de Autocorrelación para Pitch Detection
         function autoCorrelate(buf, sampleRate) {
             let SIZE = buf.length;
             let rms = 0;
@@ -583,7 +606,6 @@
             }
             rms = Math.sqrt(rms / SIZE);
 
-            // Umbral de silencio
             if (rms < 0.015) return -1;
 
             let r1 = 0, r2 = SIZE - 1, thres = 0.2;
@@ -616,7 +638,6 @@
             }
             let T0 = maxpos;
 
-            // Interpolación parabólica para precisión fina
             let x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1];
             let a = (x1 + x3 - 2 * x2) / 2;
             let b = (x3 - x1) / 2;
@@ -640,7 +661,7 @@
         }
 
         /* -------------------------------------------------------------------------- */
-        /* MOTOR DEL JUEGO (CANVAS ENGINE)                                            */
+        /* MOTOR DE JUEGO (CANVAS)                                                    */
         /* -------------------------------------------------------------------------- */
         function prepareGameLevel(level) {
             currentLevel = level;
@@ -655,7 +676,6 @@
         function startGameEngine() {
             document.getElementById('mic-start-overlay').classList.add('hidden');
             
-            // Inicializar objetos de juego
             player.x = canvas.width * 0.2;
             player.y = canvas.height / 2;
             player.targetY = canvas.height / 2;
@@ -672,7 +692,6 @@
 
         function generateObstacles() {
             obstacles = [];
-            // Mayor espaciado entre notas (65% del ancho de pantalla)
             const spacing = canvas.width * 0.65;
             let currentX = canvas.width + 120;
 
@@ -688,10 +707,8 @@
             });
         }
 
-        // Convertir Frecuencia a coordenada Y en Canvas
         function freqToY(freq) {
             const clampedFreq = Math.max(MIN_FREQ, Math.min(MAX_FREQ, freq));
-            // Invertido: notas más agudas = más arriba (Y menor)
             const ratio = (clampedFreq - MIN_FREQ) / (MAX_FREQ - MIN_FREQ);
             const padding = 60;
             return (canvas.height - padding) - ratio * (canvas.height - padding * 2);
@@ -700,88 +717,66 @@
         function gameLoop() {
             if (!gameRunning) return;
 
-            // Actualizar Temporizador
             elapsedTime = (Date.now() - startTime) / 1000;
             document.getElementById('game-timer').innerText = elapsedTime.toFixed(1) + 's';
 
-            // Actualizar Posición del Jugador con Suavizado (Lerp)
             if (currentDetectedFreq > 0) {
                 player.targetY = freqToY(currentDetectedFreq);
             }
             player.y += (player.targetY - player.y) * 0.15;
 
-            // Manejar física de rebote si chocó contra una pared
             if (player.bounceVelocityX < 0) {
-                player.bounceVelocityX += 0.4; // Desaceleración del rebote hacia atrás
+                player.bounceVelocityX += 0.4;
                 if (player.bounceVelocityX > 0) player.bounceVelocityX = 0;
             }
 
-            // Limpiar Canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 1. Dibujar Líneas Guía de las Notas (Pentagrama Adaptado)
             drawNoteGuides();
 
-            // 2. Mover y Dibujar Obstáculos (Paredes con Agujeros)
             let allPassed = true;
-            
-            // Tolerancia de 50 cents (un cuarto de tono arriba y abajo)
-            // Calculamos el tamaño exacto del agujero en píxeles basado en el rango de frecuencias de la pantalla
             const semitoneRatio = Math.pow(2, 1/12);
-            const quarterToneRatioUpper = Math.pow(semitoneRatio, 0.5); // +50 cents
-            const quarterToneRatioLower = Math.pow(semitoneRatio, -0.5); // -50 cents
+            const quarterToneRatioUpper = Math.pow(semitoneRatio, 0.5);
+            const quarterToneRatioLower = Math.pow(semitoneRatio, -0.5);
 
             obstacles.forEach(obs => {
-                // Avance continuo + efecto de desplazamiento por rebote
                 obs.x -= (gameSpeed + player.bounceVelocityX);
 
                 const centerHoleY = freqToY(obs.note.freq);
-                const upperLimitY = freqToY(obs.note.freq * quarterToneRatioUpper); // Altura máxima (+50 cents)
-                const lowerLimitY = freqToY(obs.note.freq * quarterToneRatioLower); // Altura mínima (-50 cents)
+                const upperLimitY = freqToY(obs.note.freq * quarterToneRatioUpper);
+                const lowerLimitY = freqToY(obs.note.freq * quarterToneRatioLower);
                 
-                // Tamaño exacto del agujero ajustado a +/- 50 cents
                 const holeHeight = Math.max(player.radius * 2 + 4, Math.abs(lowerLimitY - upperLimitY));
                 const wallWidth = 28;
 
-                // Dibujar la pared completa excepto el agujero ultrapreciso de la nota
-                ctx.fillStyle = '#1e293b'; // Pared sólida Slate-800
-                
-                // Pared Superior
+                ctx.fillStyle = '#1e293b';
                 ctx.fillRect(obs.x - wallWidth / 2, 0, wallWidth, centerHoleY - holeHeight / 2);
-                // Pared Inferior
                 ctx.fillRect(obs.x - wallWidth / 2, centerHoleY + holeHeight / 2, wallWidth, canvas.height - (centerHoleY + holeHeight / 2));
 
-                // Borde del Agujero Resaltado
                 ctx.strokeStyle = obs.note.color;
                 ctx.lineWidth = 3;
                 ctx.strokeRect(obs.x - wallWidth / 2 - 1, centerHoleY - holeHeight / 2, wallWidth + 2, holeHeight);
 
-                // Fondo sutil transparente en el agujero
                 ctx.fillStyle = obs.note.color + '33';
                 ctx.fillRect(obs.x - wallWidth / 2, centerHoleY - holeHeight / 2, wallWidth, holeHeight);
 
-                // Nombre de la Nota centrado en el agujero
                 ctx.fillStyle = obs.note.color;
                 ctx.font = 'bold 14px "Fredoka One", cursive';
                 ctx.textAlign = 'center';
                 ctx.fillText(obs.note.name, obs.x, centerHoleY + 5);
 
-                // LÓGICA DE COLISIÓN Y PASO POR EL AGUJERO ULTRAPRECISO (+/- 50 CENTS)
                 const inHorizontalRange = (obs.x - wallWidth / 2) <= (player.x + player.radius) && 
                                          (obs.x + wallWidth / 2) >= (player.x - player.radius);
 
                 if (inHorizontalRange && !obs.passed) {
-                    // La pelota debe entrar COMPLETAMENTE dentro del agujero (+/- 50 cents)
                     const inVerticalHole = (player.y - player.radius / 2) >= (centerHoleY - holeHeight / 2) && 
                                            (player.y + player.radius / 2) <= (centerHoleY + holeHeight / 2);
 
                     if (inVerticalHole) {
-                        // ¡Pasó la nota con afinación clavada dentro de los 50 cents!
                         obs.passed = true;
                     } else if (player.bounceVelocityX === 0) {
-                        // ¡CHOQUE! Si se desvió más de 1/4 de tono, rebota la pared hacia atrás
-                        player.bounceVelocityX = -8; 
-                        bounceEffectTimer = 15; // Visual flash de choque
+                        player.bounceVelocityX = -8;
+                        bounceEffectTimer = 15;
                     }
                 }
 
@@ -790,5 +785,108 @@
                 }
             });
 
-            // 3. Dibujar al Jugador (Pelotita Alegre)
-<!-- ... existing code -->
+            drawPlayer();
+
+            if (bounceEffectTimer > 0) {
+                bounceEffectTimer--;
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            if (allPassed && obstacles.length > 0) {
+                finishLevel();
+                return;
+            }
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function drawNoteGuides() {
+            Object.values(NOTES).forEach(note => {
+                const y = freqToY(note.freq);
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4, 6]);
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.fillStyle = note.color;
+                ctx.font = '12px "Fredoka One", cursive';
+                ctx.textAlign = 'left';
+                ctx.fillText(note.name, 12, y - 6);
+            });
+        }
+
+        function drawPlayer() {
+            ctx.save();
+            ctx.translate(player.x, player.y);
+
+            ctx.shadowColor = 'rgba(16, 185, 129, 0.4)';
+            ctx.shadowBlur = 12;
+            
+            const gradient = ctx.createRadialGradient(-4, -4, 2, 0, 0, player.radius);
+            gradient.addColorStop(0, '#6ee7b7');
+            gradient.addColorStop(1, '#10b981');
+
+            ctx.fillStyle = player.bounceVelocityX < 0 ? '#ef4444' : gradient;
+            ctx.beginPath();
+            ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Ojos sencillos
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(-4, -4, 4, 0, Math.PI * 2);
+            ctx.arc(6, -4, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(-3, -4, 2, 0, Math.PI * 2);
+            ctx.arc(7, -4, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function finishLevel() {
+            gameRunning = false;
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+            const score = Math.max(100, Math.round(1000 - (elapsedTime * 40)));
+
+            if (currentProfile) {
+                const prev = currentProfile.scores[currentLevel.id] || 0;
+                if (score > prev) {
+                    currentProfile.scores[currentLevel.id] = score;
+                    saveProfiles();
+                    renderLevelMaps();
+                }
+            }
+
+            document.getElementById('modal-result-time').innerText = elapsedTime.toFixed(1) + 's';
+            document.getElementById('modal-result-score').innerText = score + ' pts';
+            document.getElementById('level-complete-modal').classList.remove('hidden');
+
+            try {
+                confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+            } catch (e) {}
+        }
+
+        function retryCurrentLevel() {
+            document.getElementById('level-complete-modal').classList.add('hidden');
+            prepareGameLevel(currentLevel);
+        }
+
+        function exitGame() {
+            gameRunning = false;
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            document.getElementById('level-complete-modal').classList.add('hidden');
+            showScreen('world-select-screen');
+        }
+    </script>
+</body>
+</html>
