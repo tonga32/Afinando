@@ -81,14 +81,15 @@
             <h2 class="text-3xl font-fun text-emerald-600 mb-2">¡Bienvenido Cantante!</h2>
             <p class="text-slate-600 mb-6">Selecciona tu perfil o crea uno nuevo para guardar tus puntajes.</p>
 
-            <!-- Formulario Nuevo Perfil -->
-            <form id="new-profile-form" onsubmit="handleCreateProfile(event)" class="mb-6 flex gap-2">
-                <input type="text" id="profile-name-input" placeholder="Escribe tu nombre o apodo..." maxlength="18" required
+            <!-- Formulario Nuevo Perfil sin relanzamiento de página -->
+            <div class="mb-6 flex gap-2">
+                <input type="text" id="profile-name-input" placeholder="Escribe tu nombre o apodo..." maxlength="18"
+                       onkeydown="if(event.key === 'Enter') handleCreateProfile(event)"
                        class="flex-1 px-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-emerald-500 outline-none text-lg transition font-medium">
-                <button type="submit" class="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-fun text-lg rounded-2xl shadow-lg shadow-emerald-500/30 transition">
+                <button type="button" onclick="handleCreateProfile(event)" class="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-fun text-lg rounded-2xl shadow-lg shadow-emerald-500/30 transition">
                     Entrar
                 </button>
-            </form>
+            </div>
 
             <!-- Lista de Perfiles -->
             <div class="text-left">
@@ -368,9 +369,9 @@
         /* SISTEMA DE PERFILES DE USUARIO                                             */
         /* -------------------------------------------------------------------------- */
         function handleCreateProfile(e) {
-            e.preventDefault();
+            if (e && e.preventDefault) e.preventDefault();
             const input = document.getElementById('profile-name-input');
-            const name = input.value.trim();
+            const name = input ? input.value.trim() : '';
             if (!name) return;
 
             let existing = profiles.find(p => p.name.toLowerCase() === name.toLowerCase());
@@ -380,7 +381,7 @@
                 saveProfiles();
             }
             selectProfile(existing.id);
-            input.value = '';
+            if (input) input.value = '';
         }
 
         function selectProfile(profileId) {
