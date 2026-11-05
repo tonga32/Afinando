@@ -621,7 +621,16 @@
             initAudioContext();
 
             try {
-                microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                // Configuraciones de audio sin filtros agresivos para mantener notas largas
+                const audioConstraints = {
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false
+                    },
+                    video: false
+                };
+                microphoneStream = await navigator.mediaDevices.getUserMedia(audioConstraints);
                 const source = audioCtx.createMediaStreamSource(microphoneStream);
                 analyser = audioCtx.createAnalyser();
                 analyser.fftSize = 2048;
@@ -629,8 +638,18 @@
 
                 processPitch();
             } catch (err) {
-                alert("No se pudo acceder al micrófono. Por favor permite el acceso para jugar.");
-                console.error(err);
+                // Si la configuración estricta no es soportada por algún navegador antiguo, intentamos estándar
+                try {
+                    microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                    const source = audioCtx.createMediaStreamSource(microphoneStream);
+                    analyser = audioCtx.createAnalyser();
+                    analyser.fftSize = 2048;
+                    source.connect(analyser);
+                    processPitch();
+                } catch(e2) {
+                    alert("No se pudo acceder al micrófono. Por favor permite el acceso para jugar.");
+                    console.error(e2);
+                }
             }
         }
 
@@ -647,7 +666,7 @@
                 currentDetectedNote = getClosestNoteName(currentDetectedFreq);
             } else if (pitch === -1) {
                 // Si no hay voz o sonido suficiente, la pelota reposa por debajo de Do4
-                currentDetectedFreq = currentDetectedFreq * 0.9 + (MIN_FREQ) * 0.1;
+                currentDetectedFreq = currentDetectedFreq * 0.92 + (MIN_FREQ) * 0.08;
                 currentDetectedNote = "--";
             }
 
@@ -669,7 +688,8 @@
             }
             rms = Math.sqrt(rms / SIZE);
 
-            if (rms < 0.015) return -1;
+            // Umbral RMS ajustado para sostener notas tenues o largas sin cortarse
+            if (rms < 0.008) return -1;
 
             let r1 = 0, r2 = SIZE - 1, thres = 0.2;
             for (let i = 0; i < SIZE / 2; i++) {
@@ -739,8 +759,13 @@
         function startGameEngine() {
             document.getElementById('mic-start-overlay').classList.add('hidden');
             
+            // Garantizar que AudioContext se active en móviles en la respuesta al toque/clic
+            initAudioContext();
+
+            resizeCanvas();
+
             player.x = canvas.width * 0.2;
-            // La pelota arranca por debajo de Do4 (zona inferior)
+            // La pelota arranca explícitamente por debajo de Do4 (zona inferior)
             currentDetectedFreq = MIN_FREQ;
             player.targetY = freqToY(MIN_FREQ);
             player.y = player.targetY;
@@ -790,8 +815,9 @@
             player.targetY = freqToY(currentDetectedFreq);
             player.y += (player.targetY - player.y) * 0.18;
 
+            // Fricción y desaceleración del rebote más prolongado
             if (player.bounceVelocityX < 0) {
-                player.bounceVelocityX += 0.4;
+                player.bounceVelocityX += 0.28;
                 if (player.bounceVelocityX > 0) player.bounceVelocityX = 0;
             }
 
@@ -842,8 +868,9 @@
                     if (inVerticalHole) {
                         obs.passed = true;
                     } else if (player.bounceVelocityX === 0) {
-                        player.bounceVelocityX = -8;
-                        bounceEffectTimer = 15;
+                        // Rebote más pronunciado (-14 en lugar de -8)
+                        player.bounceVelocityX = -14;
+                        bounceEffectTimer = 22;
                     }
                 }
 
