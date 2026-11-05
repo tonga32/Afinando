@@ -620,11 +620,6 @@
         async function startPitchDetection() {
             initAudioContext();
 
-            // Desbloqueo forzado de audio en navegadores móviles (iOS/Android)
-            if (audioCtx.state === 'suspended') {
-                await audioCtx.resume();
-            }
-
             try {
                 microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
                 const source = audioCtx.createMediaStreamSource(microphoneStream);
@@ -744,13 +739,8 @@
         function startGameEngine() {
             document.getElementById('mic-start-overlay').classList.add('hidden');
             
-            // Garantizar que AudioContext se active en móviles en la respuesta al toque/clic
-            initAudioContext();
-
-            resizeCanvas();
-
             player.x = canvas.width * 0.2;
-            // La pelota arranca explícitamente por debajo de Do4 (zona inferior)
+            // La pelota arranca por debajo de Do4 (zona inferior)
             currentDetectedFreq = MIN_FREQ;
             player.targetY = freqToY(MIN_FREQ);
             player.y = player.targetY;
