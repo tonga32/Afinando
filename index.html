@@ -815,9 +815,9 @@
             player.targetY = freqToY(currentDetectedFreq);
             player.y += (player.targetY - player.y) * 0.18;
 
-            // Fricción y desaceleración del rebote más prolongado
+            // Fricción y desaceleración de un rebote más corto y lento
             if (player.bounceVelocityX < 0) {
-                player.bounceVelocityX += 0.28;
+                player.bounceVelocityX += 0.12;
                 if (player.bounceVelocityX > 0) player.bounceVelocityX = 0;
             }
 
@@ -868,9 +868,9 @@
                     if (inVerticalHole) {
                         obs.passed = true;
                     } else if (player.bounceVelocityX === 0) {
-                        // Rebote más pronunciado (-14 en lugar de -8)
-                        player.bounceVelocityX = -14;
-                        bounceEffectTimer = 22;
+                        // Rebote más suave y lento hacia atrás (-6)
+                        player.bounceVelocityX = -6;
+                        bounceEffectTimer = 30;
                     }
                 }
 
