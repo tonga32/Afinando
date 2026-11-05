@@ -723,51 +723,62 @@
 
             // 2. Mover y Dibujar Obstáculos (Paredes con Agujeros)
             let allPassed = true;
-            const holeHeight = 90; // Agujero amplio e intuitivo
+            
+            // Tolerancia de 50 cents (un cuarto de tono arriba y abajo)
+            // Calculamos el tamaño exacto del agujero en píxeles basado en el rango de frecuencias de la pantalla
+            const semitoneRatio = Math.pow(2, 1/12);
+            const quarterToneRatioUpper = Math.pow(semitoneRatio, 0.5); // +50 cents
+            const quarterToneRatioLower = Math.pow(semitoneRatio, -0.5); // -50 cents
 
             obstacles.forEach(obs => {
                 // Avance continuo + efecto de desplazamiento por rebote
                 obs.x -= (gameSpeed + player.bounceVelocityX);
 
-                const holeY = freqToY(obs.note.freq);
+                const centerHoleY = freqToY(obs.note.freq);
+                const upperLimitY = freqToY(obs.note.freq * quarterToneRatioUpper); // Altura máxima (+50 cents)
+                const lowerLimitY = freqToY(obs.note.freq * quarterToneRatioLower); // Altura mínima (-50 cents)
+                
+                // Tamaño exacto del agujero ajustado a +/- 50 cents
+                const holeHeight = Math.max(player.radius * 2 + 4, Math.abs(lowerLimitY - upperLimitY));
                 const wallWidth = 28;
 
-                // Dibujar la pared completa excepto el agujero de la nota
+                // Dibujar la pared completa excepto el agujero ultrapreciso de la nota
                 ctx.fillStyle = '#1e293b'; // Pared sólida Slate-800
                 
                 // Pared Superior
-                ctx.fillRect(obs.x - wallWidth / 2, 0, wallWidth, holeY - holeHeight / 2);
+                ctx.fillRect(obs.x - wallWidth / 2, 0, wallWidth, centerHoleY - holeHeight / 2);
                 // Pared Inferior
-                ctx.fillRect(obs.x - wallWidth / 2, holeY + holeHeight / 2, wallWidth, canvas.height - (holeY + holeHeight / 2));
+                ctx.fillRect(obs.x - wallWidth / 2, centerHoleY + holeHeight / 2, wallWidth, canvas.height - (centerHoleY + holeHeight / 2));
 
-                // Agujero Resaltado Brillante con el Color de la Nota
+                // Borde del Agujero Resaltado
                 ctx.strokeStyle = obs.note.color;
-                ctx.lineWidth = 4;
-                ctx.strokeRect(obs.x - wallWidth / 2 - 2, holeY - holeHeight / 2, wallWidth + 4, holeHeight);
+                ctx.lineWidth = 3;
+                ctx.strokeRect(obs.x - wallWidth / 2 - 1, centerHoleY - holeHeight / 2, wallWidth + 2, holeHeight);
 
                 // Fondo sutil transparente en el agujero
-                ctx.fillStyle = obs.note.color + '22';
-                ctx.fillRect(obs.x - wallWidth / 2, holeY - holeHeight / 2, wallWidth, holeHeight);
+                ctx.fillStyle = obs.note.color + '33';
+                ctx.fillRect(obs.x - wallWidth / 2, centerHoleY - holeHeight / 2, wallWidth, holeHeight);
 
                 // Nombre de la Nota centrado en el agujero
                 ctx.fillStyle = obs.note.color;
-                ctx.font = 'bold 18px "Fredoka One", cursive';
+                ctx.font = 'bold 14px "Fredoka One", cursive';
                 ctx.textAlign = 'center';
-                ctx.fillText(obs.note.name, obs.x, holeY + 6);
+                ctx.fillText(obs.note.name, obs.x, centerHoleY + 5);
 
-                // LÓGICA DE COLISIÓN Y PASO POR EL AGUJERO
+                // LÓGICA DE COLISIÓN Y PASO POR EL AGUJERO ULTRAPRECISO (+/- 50 CENTS)
                 const inHorizontalRange = (obs.x - wallWidth / 2) <= (player.x + player.radius) && 
                                          (obs.x + wallWidth / 2) >= (player.x - player.radius);
 
                 if (inHorizontalRange && !obs.passed) {
-                    const inVerticalHole = (player.y - player.radius / 2) >= (holeY - holeHeight / 2) && 
-                                           (player.y + player.radius / 2) <= (holeY + holeHeight / 2);
+                    // La pelota debe entrar COMPLETAMENTE dentro del agujero (+/- 50 cents)
+                    const inVerticalHole = (player.y - player.radius / 2) >= (centerHoleY - holeHeight / 2) && 
+                                           (player.y + player.radius / 2) <= (centerHoleY + holeHeight / 2);
 
                     if (inVerticalHole) {
-                        // ¡Pasó la nota correctamente!
+                        // ¡Pasó la nota con afinación clavada dentro de los 50 cents!
                         obs.passed = true;
                     } else if (player.bounceVelocityX === 0) {
-                        // ¡CHOQUE! Rebota la pared hacia atrás para reintentar la misma nota
+                        // ¡CHOQUE! Si se desvió más de 1/4 de tono, rebota la pared hacia atrás
                         player.bounceVelocityX = -8; 
                         bounceEffectTimer = 15; // Visual flash de choque
                     }
@@ -779,174 +790,4 @@
             });
 
             // 3. Dibujar al Jugador (Pelotita Alegre)
-            drawPlayer();
-
-            // Destello visual al chocar
-            if (bounceEffectTimer > 0) {
-                ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                bounceEffectTimer--;
-            }
-
-            // Verificar si terminó el nivel
-            if (allPassed && obstacles.length > 0 && obstacles[obstacles.length - 1].x < player.x - 50) {
-                finishLevel();
-                return;
-            }
-
-            animationFrameId = requestAnimationFrame(gameLoop);
-        }
-
-        function drawNoteGuides() {
-            Object.keys(NOTES).forEach(key => {
-                const note = NOTES[key];
-                const y = freqToY(note.freq);
-
-                ctx.beginPath();
-                ctx.strokeStyle = note.color + '55'; // Semi-transparente
-                ctx.lineWidth = 2;
-                ctx.setLineDash([8, 6]);
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
-                ctx.stroke();
-                ctx.setLineDash([]);
-
-                // Etiqueta de la nota en el lateral izquierdo
-                ctx.fillStyle = note.color;
-                ctx.font = 'bold 13px Quicksand';
-                ctx.textAlign = 'left';
-                ctx.fillText(note.name, 12, y + 4);
-            });
-        }
-
-        function drawPlayer() {
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-            ctx.fillStyle = bounceEffectTimer > 0 ? '#ef4444' : '#10b981'; // Se pone roja si choca
-            ctx.shadowColor = bounceEffectTimer > 0 ? '#ef444488' : '#10b98188';
-            ctx.shadowBlur = 14;
-            ctx.fill();
-
-            // Ojitos del personaje
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath();
-            ctx.arc(player.x - 5, player.y - 4, 4, 0, Math.PI * 2);
-            ctx.arc(player.x + 5, player.y - 4, 4, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.fillStyle = '#0f172a';
-            ctx.beginPath();
-            ctx.arc(player.x - 4, player.y - 4, 2, 0, Math.PI * 2);
-            ctx.arc(player.x + 4, player.y - 4, 2, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Sonrisa o expresión de choque
-            ctx.beginPath();
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
-            if (bounceEffectTimer > 0) {
-                // Boca 'o' de choque
-                ctx.arc(player.x, player.y + 4, 3, 0, Math.PI * 2);
-            } else {
-                // Sonrisa
-                ctx.arc(player.x, player.y + 2, 5, 0.1 * Math.PI, 0.9 * Math.PI);
-            }
-            ctx.stroke();
-            ctx.restore();
-        }
-
-        /* -------------------------------------------------------------------------- */
-        /* RESULTADOS Y TABLA DE POSICIONES                                           */
-        /* -------------------------------------------------------------------------- */
-        function finishLevel() {
-            gameRunning = false;
-            cancelAnimationFrame(animationFrameId);
-
-            // Detener Micrófono
-            if (microphoneStream) {
-                microphoneStream.getTracks().forEach(track => track.stop());
-            }
-
-            // Cálculo de Puntaje
-            const baseScore = 1000;
-            const timePenalty = Math.floor(elapsedTime * 25);
-            const finalScore = Math.max(100, baseScore - timePenalty);
-
-            // Guardar Puntaje en Perfil Activo
-            if (currentProfile) {
-                const prevScore = currentProfile.scores[currentLevel.id] || 0;
-                if (finalScore > prevScore) {
-                    currentProfile.scores[currentLevel.id] = finalScore;
-                    saveProfiles();
-                }
-            }
-
-            // Mostrar Modal con Confeti
-            document.getElementById('modal-result-time').innerText = elapsedTime.toFixed(1) + 's';
-            document.getElementById('modal-result-score').innerText = finalScore + ' pts';
-            document.getElementById('level-complete-modal').classList.remove('hidden');
-
-            confetti({
-                particleCount: 80,
-                spread: 70,
-                origin: { y: 0.6 }
-            });
-        }
-
-        function retryCurrentLevel() {
-            document.getElementById('level-complete-modal').classList.add('hidden');
-            startGameEngine();
-        }
-
-        function exitGame() {
-            gameRunning = false;
-            cancelAnimationFrame(animationFrameId);
-            if (microphoneStream) {
-                microphoneStream.getTracks().forEach(track => track.stop());
-            }
-            document.getElementById('level-complete-modal').classList.add('hidden');
-            renderLevelMaps();
-            showScreen('world-select-screen');
-        }
-
-        /* Modal Leaderboard */
-        function showLeaderboardModal() {
-            const container = document.getElementById('leaderboard-content');
-            container.innerHTML = '';
-
-            if (profiles.length === 0) {
-                container.innerHTML = '<p class="text-slate-400 text-center py-4 text-sm">No hay datos registrados aún.</p>';
-            } else {
-                // Ordenar perfiles por puntaje acumulado
-                const sorted = [...profiles].sort((a, b) => {
-                    const scoreA = Object.values(a.scores).reduce((x, y) => x + y, 0);
-                    const scoreB = Object.values(b.scores).reduce((x, y) => x + y, 0);
-                    return scoreB - scoreA;
-                });
-
-                sorted.forEach((p, idx) => {
-                    const totalScore = Object.values(p.scores).reduce((x, y) => x + y, 0);
-                    const item = document.createElement('div');
-                    item.className = "flex justify-between items-center bg-slate-50 p-3 rounded-2xl border border-slate-200";
-                    
-                    item.innerHTML = `
-                        <div class="flex items-center gap-3">
-                            <span class="font-fun text-lg w-6 text-center ${idx === 0 ? 'text-amber-500' : 'text-slate-400'}">#${idx + 1}</span>
-                            <span class="font-bold text-slate-700">${p.name}</span>
-                        </div>
-                        <span class="font-fun text-emerald-600 text-lg">${totalScore} pts</span>
-                    `;
-                    container.appendChild(item);
-                });
-            }
-
-            document.getElementById('leaderboard-modal').classList.remove('hidden');
-        }
-
-        function closeLeaderboardModal() {
-            document.getElementById('leaderboard-modal').classList.add('hidden');
-        }
-    </script>
-</body>
-</html>
+<!-- ... existing code -->
